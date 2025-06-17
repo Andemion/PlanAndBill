@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "603969503635",
+    "project_id": "planandbill-mds2025",
+    "storage_bucket": "planandbill-mds2025.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:603969503635:android:7b590ccb23619d12b62866",
+        "android_client_info": {
+          "package_name": "com.arttherapy.planandbill"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "603969503635-hvbgcg9iqm18vara993kqcup09nmou5s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.arttherapy.planandbill",
+            "certificate_hash": "263f0f6f4fe644e7bee7427d0050d00257e7fcd8"
+          }
+        },
+        {
+          "client_id": "603969503635-sjggpdq0fok7csvebdhv8mmq1i5mvgu2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDvxDt0IyFnU9RL1BjTvIwLqfjRp0SfveY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "603969503635-sjggpdq0fok7csvebdhv8mmq1i5mvgu2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,5 +1,7 @@
-package com.example.planandbill
+package com.arttherapy.planandbill
 
 import io.flutter.embedding.android.FlutterActivity
 
-class MainActivity: FlutterActivity()
+class MainActivity: FlutterActivity(){
+
+}
