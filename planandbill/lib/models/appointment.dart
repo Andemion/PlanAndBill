@@ -12,6 +12,7 @@ class Appointment {
   final String location;
   final String notes;
   final double? fee;
+  final String currency;
   final String status; // scheduled, completed, cancelled
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -28,6 +29,7 @@ class Appointment {
     required this.location,
     required this.notes,
     this.fee,
+    required this.currency,
     required this.status,
     required this.createdAt,
     this.updatedAt,
@@ -46,6 +48,7 @@ class Appointment {
       'location': location,
       'notes': notes,
       'fee': fee,
+      'currency': currency,
       'status': status,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
@@ -65,6 +68,7 @@ class Appointment {
       location: map['location'] ?? '',
       notes: map['notes'] ?? '',
       fee: map['fee']?.toDouble(),
+      currency: map['currency'] ?? '€',
       status: map['status'] ?? 'scheduled',
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       updatedAt: map['updatedAt'] != null ? (map['updatedAt'] as Timestamp).toDate() : null,
@@ -83,6 +87,7 @@ class Appointment {
     String? location,
     String? notes,
     double? fee,
+    String? currency,
     String? status,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -99,6 +104,7 @@ class Appointment {
       location: location ?? this.location,
       notes: notes ?? this.notes,
       fee: fee ?? this.fee,
+      currency: currency ?? this.currency,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

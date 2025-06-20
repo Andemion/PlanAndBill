@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:planandbill/services/auth_service.dart';
+import 'package:planandbill/services/notification_service.dart';
 import 'package:planandbill/screens/auth/login_screen.dart';
 import 'package:planandbill/screens/settings/business_info_screen.dart';
 import 'package:planandbill/theme/app_theme.dart';
+
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -15,10 +17,14 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationsEnabled = true;
   bool _emailReportsEnabled = true;
+  bool _dailyReminderEnabled = false;
+  TimeOfDay _dailyReminderTime = const TimeOfDay(hour: 8, minute: 0);
 
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AuthService>(context).user;
+    final appointmentService = Provider.of<AppointmentService>(context, listen: false);
+    final appointments = await appointmentService.getAppointmentsForUser(user!.id);
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -35,18 +41,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildSettingsCard([
               _buildSwitchTile(
                 'Push Notifications',
-                'Receive appointment reminders',
+                'Receive appointment reminders 1 hour before',
                 Icons.notifications_outlined,
                 _notificationsEnabled,
-                    (value) {
+                    (value) async {
                   setState(() {
                     _notificationsEnabled = value;
                   });
+                  if (value) {
+                    for (final appointment in appointments) {
+                      // Planifie seulement ceux dans le futur
+                      if (appointment.date.isAfter(DateTime.now())) {
+                        await NotificationService.scheduleAppointmentNotification(appointment);
+                      }
+                    }
+                  } else {
+                    // Optionnel : cancel all notifications
+                    await FlutterLocalNotificationsPlugin().cancelAll();
+                  }
                 },
               ),
+
+              _buildSwitchTile(
+                'Daily Notification',
+                'Receive the list of tomorrow\'s appointments',
+                Icons.today_outlined,
+                _dailyReminderEnabled,
+                    (value) {
+                  setState(() {
+                    _dailyReminderEnabled = value;
+                  });
+                },
+              ),
+              if (_dailyReminderEnabled)
+                ListTile(
+                  leading: const Icon(Icons.schedule),
+                  title: const Text('Heure de notification'),
+                  subtitle: Text(
+                    _dailyReminderTime.format(context),
+                  ),
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: _dailyReminderTime,
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _dailyReminderTime = picked;
+                      });
+                    }
+                  },
+                ),
               _buildSwitchTile(
                 'Email Reports',
-                'Weekly and monthly summaries',
+                'Monthly summaries',
                 Icons.email_outlined,
                 _emailReportsEnabled,
                     (value) {
@@ -74,26 +122,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
-              _buildTile(
-                'Invoice Templates',
-                'Customize your invoice design',
-                Icons.receipt_long_outlined,
-                    () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Invoice templates feature coming soon!')),
-                  );
-                },
-              ),
-              _buildTile(
-                'Payment Methods',
-                'Manage accepted payment options',
-                Icons.payment_outlined,
-                    () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Payment methods feature coming soon!')),
-                  );
-                },
-              ),
+              // _buildTile(
+              //   'Invoice Templates',
+              //   'Customize your invoice design',
+              //   Icons.receipt_long_outlined,
+              //       () {
+              //     ScaffoldMessenger.of(context).showSnackBar(
+              //       const SnackBar(content: Text('Invoice templates feature coming soon!')),
+              //     );
+              //   },
+              // ),
+              // _buildTile(
+              //   'Payment Methods',
+              //   'Manage accepted payment options',
+              //   Icons.payment_outlined,
+              //       () {
+              //     ScaffoldMessenger.of(context).showSnackBar(
+              //       const SnackBar(content: Text('Payment methods feature coming soon!')),
+              //     );
+              //   },
+              // ),
             ]),
 
             const SizedBox(height: 24),
@@ -133,14 +181,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Support
             _buildSectionTitle('Support'),
             _buildSettingsCard([
-              _buildTile(
-                'Help Center',
-                'Get help and support',
-                Icons.help_outline,
-                    () {
-                  _showHelpCenter();
-                },
-              ),
+              // _buildTile(
+              //   'Help Center',
+              //   'Get help and support',
+              //   Icons.help_outline,
+              //       () {
+              //     _showHelpCenter();
+              //   },
+              // ),
               _buildTile(
                 'Contact Us',
                 'Send feedback or report issues',

@@ -5,6 +5,9 @@ import 'package:planandbill/services/invoice_service.dart';
 import 'package:planandbill/screens/billing/create_invoice_screen.dart';
 import 'package:planandbill/theme/app_theme.dart';
 import 'package:planandbill/services/pdf_service.dart';
+import 'package:planandbill/services/auth_service.dart';
+import 'package:planandbill/services/email_service.dart';
+
 
 class InvoiceDetailsScreen extends StatelessWidget {
   final Invoice invoice;
@@ -250,78 +253,45 @@ class InvoiceDetailsScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Table(
-              columnWidths: const {
-                0: FlexColumnWidth(3),
-                1: FlexColumnWidth(1),
-                2: FlexColumnWidth(1),
-                3: FlexColumnWidth(1),
-              },
+
+            // En-têtes
+            Row(
+              children: const [
+                Expanded(flex: 3, child: Text('Description', style: TextStyle(fontWeight: FontWeight.bold))),
+                Expanded(flex: 1, child: Text('Qty', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+                Expanded(flex: 2, child: Text('Price', style: TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+              ],
+            ),
+            const Divider(),
+
+            // Lignes d’items
+            ...invoice.items.map((item) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(flex: 3, child: Text(item.description)),
+                  Expanded(flex: 1, child: Text('${item.quantity}', textAlign: TextAlign.center)),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      '${invoice.currency} ${item.unitPrice.toStringAsFixed(2)}',
+                      textAlign: TextAlign.right,
+                    ),
+                  ),
+                ],
+              ),
+            )),
+
+            const Divider(height: 32),
+
+            // Total général
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                const TableRow(
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Text(
-                        'Description',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Text(
-                        'Qty',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Text(
-                        'Price',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Text(
-                        'Total',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                  ],
+                Text(
+                  'Total: ${invoice.currency} ${invoice.total.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
-                ...invoice.items.map((item) => TableRow(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(item.description),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(
-                        item.quantity.toString(),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(
-                        '€${item.unitPrice.toStringAsFixed(2)}',
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: Text(
-                        '€${item.total.toStringAsFixed(2)}',
-                        textAlign: TextAlign.right,
-                      ),
-                    ),
-                  ],
-                )),
               ],
             ),
           ],
@@ -336,17 +306,17 @@ class InvoiceDetailsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _buildTotalRow('Subtotal:', invoice.subtotal),
-            _buildTotalRow('Tax (${invoice.taxRate.toStringAsFixed(1)}%):', invoice.taxAmount),
+            _buildTotalRow('Subtotal:', invoice.subtotal, invoice.currency),
+            _buildTotalRow('Tax (${invoice.taxRate.toStringAsFixed(1)}%):', invoice.taxAmount, invoice.currency),
             const Divider(),
-            _buildTotalRow('Total:', invoice.total, isTotal: true),
+            _buildTotalRow('Total:', invoice.total, invoice.currency, isTotal: true),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTotalRow(String label, double amount, {bool isTotal = false}) {
+  Widget _buildTotalRow(String label, double amount, String currency, {bool isTotal = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -360,7 +330,7 @@ class InvoiceDetailsScreen extends StatelessWidget {
             ),
           ),
           Text(
-            '€${amount.toStringAsFixed(2)}',
+            '${currency} ${amount.toStringAsFixed(2)}',
             style: TextStyle(
               fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
               fontSize: isTotal ? 16 : 14,
@@ -402,7 +372,21 @@ class InvoiceDetailsScreen extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: () => _markAsSent(context),
               icon: const Icon(Icons.send),
-              label: const Text('Mark as Sent'),
+              label: const Text('Send my email'),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (invoice.type == 'quote' && invoice.status == 'sent') ...[
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _convertToInvoice(context),
+              icon: const Icon(Icons.swap_horiz),
+              label: const Text('Convert to Invoice'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.darkNavy,
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -491,25 +475,20 @@ class InvoiceDetailsScreen extends StatelessWidget {
     }
   }
 
-  void _convertToInvoice(BuildContext context) {
-    final convertedInvoice = invoice.copyWith(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      type: 'invoice',
-      status: 'draft',
-    );
+  void _markAsSent(BuildContext context) async {
+    try {
+      final emailService = EmailService();
+      final pdfService = PdfService();
+      final pdfData = await pdfService.generateInvoicePdf(invoice);
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => CreateInvoiceScreen(
-          invoice: convertedInvoice,
-          type: 'invoice',
-        ),
-      ),
-    );
-  }
+      await emailService.shareInvoicePdf(pdfData, invoice);
 
-  void _markAsSent(BuildContext context) {
-    _updateStatus(context, 'sent');
+      _updateStatus(context, 'sent');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur lors de l\'envoi de l\'email : $e')),
+      );
+    }
   }
 
   void _markAsPaid(BuildContext context) {
@@ -520,7 +499,7 @@ class InvoiceDetailsScreen extends StatelessWidget {
     final invoiceService = Provider.of<InvoiceService>(context, listen: false);
     final updatedInvoice = invoice.copyWith(status: newStatus);
 
-    invoiceService.updateInvoice(updatedInvoice).then((success) {
+    invoiceService.upsertInvoice(updatedInvoice).then((success) {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${invoice.type.toUpperCase()} marked as ${newStatus}')),
@@ -595,4 +574,36 @@ class InvoiceDetailsScreen extends StatelessWidget {
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
+
+  Future<void> _convertToInvoice(BuildContext context) async {
+    final invoiceService = Provider.of<InvoiceService>(context, listen: false);
+    final authService = Provider.of<AuthService>(context, listen: false);
+
+    // Remplacer 'devis' par 'facture' dans le numéro
+    final updatedNumber = invoice.number.replaceFirst(RegExp(r'^devis', caseSensitive: false), 'facture');
+
+    final updatedInvoice = invoice.copyWith(
+      type: 'invoice',
+      number: updatedNumber,
+    );
+
+    final success = await invoiceService.upsertInvoice(updatedInvoice);
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Quote converted to invoice')),
+      );
+      Navigator.of(context).pop(); // retour à l’écran précédent
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(invoiceService.error ?? 'Failed to convert quote'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
 }
+
+

@@ -5,6 +5,9 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:planandbill/models/invoice.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 class PdfService {
   // Generate PDF for invoice
@@ -18,6 +21,17 @@ class PdfService {
     // Format dates
     final dateFormat = DateFormat('dd/MM/yyyy');
 
+    // Business details
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    final businessInfo = await fetchBusinessInfo(userId ?? '');
+
+    final businessName = businessInfo?['businessName'];
+    final businessAddress = businessInfo?['address'];
+    final businessPhone = businessInfo?['phone'];
+    final businessEmail = businessInfo?['email'];
+    final businessTaxNumber = businessInfo?['taxNumber'];
+
+
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -30,21 +44,21 @@ class PdfService {
               children: [
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      businessName ?? 'Art Therapy Practice',
-                      style: pw.TextStyle(
-                        font: fontBold,
-                        fontSize: 24,
+                    children: [
+                      pw.Text(
+                        businessName ?? 'Art Therapy Practice',
+                        style: pw.TextStyle(
+                          font: fontBold,
+                          fontSize: 24,
+                        ),
                       ),
-                    ),
-                    pw.SizedBox(height: 10),
-                    pw.Text(businessAddress ?? '123 Therapy Street\n75001 Paris, France'),
-                    pw.SizedBox(height: 5),
-                    pw.Text('Phone: ${businessPhone ?? '+33 1 23 45 67 89'}'),
-                    pw.Text('Email: ${businessEmail ?? 'contact@arttherapy.com'}'),
-                    if (businessTaxNumber != null) pw.Text('Tax ID: $businessTaxNumber'),
-                  ],
+                      pw.SizedBox(height: 10),
+                      pw.Text(businessAddress ?? '123 Therapy Street\n75001 Paris, France'),
+                      pw.SizedBox(height: 5),
+                      pw.Text('Phone: ${businessPhone ?? '+33 1 23 45 67 89'}'),
+                      pw.Text('Email: ${businessEmail ?? 'contact@arttherapy.com'}'),
+                      if (businessTaxNumber != null) pw.Text('Tax ID: $businessTaxNumber'),
+                    ],
                 ),
                 pw.Container(
                   padding: const pw.EdgeInsets.all(10),
@@ -179,14 +193,16 @@ class PdfService {
                     pw.Padding(
                       padding: const pw.EdgeInsets.all(8),
                       child: pw.Text(
-                        '€${item.unitPrice.toStringAsFixed(2)}',
+                        '${invoice.currency} ${item.unitPrice.toStringAsFixed(2)}',
+                        style: pw.TextStyle(font: fontBold),
                         textAlign: pw.TextAlign.right,
                       ),
                     ),
                     pw.Padding(
                       padding: const pw.EdgeInsets.all(8),
                       child: pw.Text(
-                        '€${item.total.toStringAsFixed(2)}',
+                        '${invoice.currency} ${item.total.toStringAsFixed(2)}',
+                        style: pw.TextStyle(font: fontBold),
                         textAlign: pw.TextAlign.right,
                       ),
                     ),
@@ -213,7 +229,8 @@ class PdfService {
                       pw.Container(
                         width: 100,
                         child: pw.Text(
-                          '€${invoice.subtotal.toStringAsFixed(2)}',
+                          '${invoice.currency} ${invoice.subtotal.toStringAsFixed(2)}',
+                          style: pw.TextStyle(font: fontBold),
                           textAlign: pw.TextAlign.right,
                         ),
                       ),
@@ -230,7 +247,8 @@ class PdfService {
                       pw.Container(
                         width: 100,
                         child: pw.Text(
-                          '€${invoice.taxAmount.toStringAsFixed(2)}',
+                          '${invoice.currency} ${invoice.taxAmount.toStringAsFixed(2)}',
+                          style: pw.TextStyle(font: fontBold),
                           textAlign: pw.TextAlign.right,
                         ),
                       ),
@@ -251,7 +269,7 @@ class PdfService {
                       pw.Container(
                         width: 100,
                         child: pw.Text(
-                          '€${invoice.total.toStringAsFixed(2)}',
+                          '${invoice.currency} ${invoice.total.toStringAsFixed(2)}',
                           style: pw.TextStyle(font: fontBold),
                           textAlign: pw.TextAlign.right,
                         ),
@@ -311,16 +329,19 @@ class PdfService {
   Future<Uint8List> generateMonthlyReportPdf(
       DateTime month,
       List<Invoice> invoices,
-      double totalRevenue,
       int totalClients,
       int totalAppointments,
-      {String? businessName}
       ) async {
     final pdf = pw.Document();
 
     // Load font
     final font = await PdfGoogleFonts.robotoRegular();
     final fontBold = await PdfGoogleFonts.robotoBold();
+
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    final businessSnapshot = await FirebaseFirestore.instance.collection('businesses').doc(userId).get();
+    final businessData = businessSnapshot.data() as Map<String, dynamic>?;
+    final businessName = businessData?['businessName'] ?? 'Your Business';
 
     // Format dates
     final dateFormat = DateFormat('MMMM yyyy');
@@ -329,8 +350,13 @@ class PdfService {
     // Calculate statistics
     final paidInvoices = invoices.where((i) => i.status == 'paid').toList();
     final pendingInvoices = invoices.where((i) => i.status == 'pending' || i.status == 'sent').toList();
-    final paidAmount = paidInvoices.fold(0.0, (sum, i) => sum + i.total);
+    final Map<String, double> revenueByCurrency = {};
+    for (var invoice in paidInvoices) {
+      revenueByCurrency[invoice.currency] = (revenueByCurrency[invoice.currency] ?? 0.0) + invoice.total;
+    }
+
     final pendingAmount = pendingInvoices.fold(0.0, (sum, i) => sum + i.total);
+    final currency = invoices.where((i) => i.currency == '€');
 
     pdf.addPage(
       pw.MultiPage(
@@ -377,60 +403,53 @@ class PdfService {
                 color: PdfColors.green100,
                 borderRadius: pw.BorderRadius.circular(10),
               ),
-              child: pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Column(
-                    children: [
-                      pw.Text(
-                        'Total Revenue',
-                        style: pw.TextStyle(
-                          font: fontBold,
-                        ),
-                      ),
-                      pw.SizedBox(height: 5),
-                      pw.Text(
-                        '€${totalRevenue.toStringAsFixed(2)}',
-                        style: pw.TextStyle(
-                          font: fontBold,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ],
+                  pw.Text(
+                    'Total Revenue',
+                    style: pw.TextStyle(font: fontBold),
                   ),
-                  pw.Column(
-                    children: [
-                      pw.Text(
-                        'Total Clients',
-                        style: pw.TextStyle(
-                          font: fontBold,
-                        ),
+                  pw.SizedBox(height: 5),
+                  // 🔁 Une ligne par devise
+                  ...revenueByCurrency.entries.map(
+                        (entry) => pw.Text(
+                      '${entry.key} ${entry.value.toStringAsFixed(2)}',
+                      style: pw.TextStyle(
+                        font: fontBold,
+                        fontSize: 16,
                       ),
-                      pw.SizedBox(height: 5),
-                      pw.Text(
-                        totalClients.toString(),
-                        style: pw.TextStyle(
-                          font: fontBold,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  pw.Column(
+                  pw.SizedBox(height: 10),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Text(
-                        'Total Appointments',
-                        style: pw.TextStyle(
-                          font: fontBold,
-                        ),
+                      pw.Column(
+                        children: [
+                          pw.Text(
+                            'Total Clients',
+                            style: pw.TextStyle(font: fontBold),
+                          ),
+                          pw.SizedBox(height: 5),
+                          pw.Text(
+                            totalClients.toString(),
+                            style: pw.TextStyle(font: fontBold, fontSize: 16),
+                          ),
+                        ],
                       ),
-                      pw.SizedBox(height: 5),
-                      pw.Text(
-                        totalAppointments.toString(),
-                        style: pw.TextStyle(
-                          font: fontBold,
-                          fontSize: 18,
-                        ),
+                      pw.Column(
+                        children: [
+                          pw.Text(
+                            'Total Appointments',
+                            style: pw.TextStyle(font: fontBold),
+                          ),
+                          pw.SizedBox(height: 5),
+                          pw.Text(
+                            totalAppointments.toString(),
+                            style: pw.TextStyle(font: fontBold, fontSize: 16),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -440,7 +459,7 @@ class PdfService {
 
             pw.SizedBox(height: 30),
 
-            // Invoice Summary
+            // Résumé des factures
             pw.Text(
               'Invoice Summary',
               style: pw.TextStyle(
@@ -449,6 +468,7 @@ class PdfService {
               ),
             ),
             pw.SizedBox(height: 10),
+
             pw.Container(
               padding: const pw.EdgeInsets.all(10),
               decoration: pw.BoxDecoration(
@@ -457,6 +477,7 @@ class PdfService {
               ),
               child: pw.Column(
                 children: [
+                  // Total global
                   pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
@@ -466,13 +487,9 @@ class PdfService {
                     ],
                   ),
                   pw.SizedBox(height: 10),
-                  pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text('Paid Amount: €${paidAmount.toStringAsFixed(2)}'),
-                      pw.Text('Pending Amount: €${pendingAmount.toStringAsFixed(2)}'),
-                    ],
-                  ),
+
+                  // Groupement par devise
+                  ..._buildAmountByCurrency(paidInvoices, pendingInvoices, fontBold),
                 ],
               ),
             ),
@@ -563,7 +580,8 @@ class PdfService {
                     pw.Padding(
                       padding: const pw.EdgeInsets.all(8),
                       child: pw.Text(
-                        '€${invoice.total.toStringAsFixed(2)}',
+                        '${invoice.currency} ${invoice.total.toStringAsFixed(2)}',
+                        style: pw.TextStyle(font: fontBold),
                         textAlign: pw.TextAlign.right,
                       ),
                     ),
@@ -603,4 +621,38 @@ class PdfService {
   Future<void> savePdf(Uint8List pdfData, String fileName) async {
     await Printing.sharePdf(bytes: pdfData, filename: fileName);
   }
+
+  List<pw.Widget> _buildAmountByCurrency(List<Invoice> paid, List<Invoice> pending, pw.Font fontBold) {
+    final currencies = {...paid.map((i) => i.currency), ...pending.map((i) => i.currency)};
+
+    return currencies.map((currency) {
+      final paidTotal = paid.where((i) => i.currency == currency).fold(0.0, (sum, i) => sum + i.total);
+      final pendingTotal = pending.where((i) => i.currency == currency).fold(0.0, (sum, i) => sum + i.total);
+
+      return pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text('Paid Amount ($currency): ${paidTotal.toStringAsFixed(2)}',
+              style: pw.TextStyle(font: fontBold)),
+          pw.Text('Pending Amount ($currency): ${pendingTotal.toStringAsFixed(2)}',
+              style: pw.TextStyle(font: fontBold)),
+        ],
+      );
+    }).toList();
+  }
+
+  Future<Map<String, dynamic>?> fetchBusinessInfo(String userId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('businesses')
+          .doc(userId)
+          .get();
+
+      return doc.exists ? doc.data() : null;
+    } catch (e) {
+      print('Error fetching business info: $e');
+      return null;
+    }
+  }
+
 }

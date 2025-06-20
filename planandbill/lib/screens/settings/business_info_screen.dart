@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:planandbill/services/auth_service.dart';
 import 'package:planandbill/theme/app_theme.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 class BusinessInfoScreen extends StatefulWidget {
   const BusinessInfoScreen({super.key});
@@ -28,17 +30,29 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
     _loadBusinessInfo();
   }
 
-  void _loadBusinessInfo() {
-    // TODO: Load business info from Firestore
-    // For now, use placeholder data
-    _businessNameController.text = 'Art Therapy Practice';
-    _addressController.text = '123 Therapy Street\n75001 Paris, France';
-    _phoneController.text = '+33 1 23 45 67 89';
-    _emailController.text = 'contact@arttherapy.com';
-    _websiteController.text = 'www.arttherapy.com';
-    _taxNumberController.text = 'FR12345678901';
-    _registrationNumberController.text = '123456789';
+  Future<void> _loadBusinessInfo() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final userId = authService.user?.id;
+
+    if (userId == null) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('businesses')
+        .doc(userId)
+        .get();
+
+    if (doc.exists) {
+      final data = doc.data()!;
+      _businessNameController.text = data['businessName'] ?? '';
+      _addressController.text = data['address'] ?? '';
+      _phoneController.text = data['phone'] ?? '';
+      _emailController.text = data['email'] ?? '';
+      _websiteController.text = data['website'] ?? '';
+      _taxNumberController.text = data['taxNumber'] ?? '';
+      _registrationNumberController.text = data['registrationNumber'] ?? '';
+    }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -230,8 +244,28 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
     });
 
     try {
-      // TODO: Save business info to Firestore
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final userId = authService.user?.id;
+
+      if (userId == null) {
+        throw Exception('User not authenticated');
+      }
+
+      final businessData = {
+        'businessName': _businessNameController.text,
+        'address': _addressController.text,
+        'phone': _phoneController.text,
+        'email': _emailController.text,
+        'website': _websiteController.text,
+        'taxNumber': _taxNumberController.text,
+        'registrationNumber': _registrationNumberController.text,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await FirebaseFirestore.instance
+          .collection('businesses')
+          .doc(userId)
+          .set(businessData, SetOptions(merge: true)); // merge pour mise à jour
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -256,6 +290,7 @@ class _BusinessInfoScreenState extends State<BusinessInfoScreen> {
       }
     }
   }
+
 
   @override
   void dispose() {

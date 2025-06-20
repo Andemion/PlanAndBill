@@ -24,67 +24,38 @@ class InvoiceService extends ChangeNotifier {
 
     final querySnapshot = limit > 0 ? await query.limit(limit).get() : await query.get();
 
-    return querySnapshot.docs.map((doc) => Invoice.fromMap(doc.data())).toList();
+    final allInvoices = querySnapshot.docs
+        .map((doc) => Invoice.fromMap(doc.data()))
+        .toList();
+
+    _invoices = querySnapshot.docs
+        .map((doc) => Invoice.fromMap(doc.data()))
+        .toList();
+
+    notifyListeners();
+
+    return _invoices;
   }
 
   // Create new invoice
-  Future<bool> createInvoice(Invoice invoice) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
+  Future<bool> upsertInvoice(Invoice invoice) async {
     try {
-      await _firestore
-          .collection('invoices')
-          .doc(invoice.id)
-          .set(invoice.toMap());
+      final docRef = _firestore.collection('invoices').doc(invoice.id);
 
-      _invoices.add(invoice);
-      _invoices.sort((a, b) => b.date.compareTo(a.date));
+      final docSnapshot = await docRef.get();
 
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _error = e.toString();
-      notifyListeners();
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // Update invoice
-  Future<bool> updateInvoice(Invoice invoice) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-
-    try {
-      final updatedInvoice = invoice.copyWith(
-        updatedAt: DateTime.now(),
-      );
-
-      await _firestore
-          .collection('invoices')
-          .doc(invoice.id)
-          .update(updatedInvoice.toMap());
-
-      final index = _invoices.indexWhere((i) => i.id == invoice.id);
-      if (index != -1) {
-        _invoices[index] = updatedInvoice;
-        _invoices.sort((a, b) => b.date.compareTo(a.date));
+      if (docSnapshot.exists) {
+        // Le document existe => on le met à jour
+        await docRef.update(invoice.toMap());
+      } else {
+        // Le document n'existe pas => on le crée
+        await docRef.set(invoice.toMap());
       }
 
-      notifyListeners();
       return true;
     } catch (e) {
-      _error = e.toString();
-      notifyListeners();
+      print('Error in upsertInvoice: $e');
       return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
     }
   }
 
@@ -142,6 +113,7 @@ class InvoiceService extends ChangeNotifier {
   Future<String> generateCustomInvoiceNumber({
     required String clientName,
     required String userId,
+    String typeLabel = 'facture',
   }) async {
     final now = DateTime.now();
     final dateStr =
@@ -163,7 +135,7 @@ class InvoiceService extends ChangeNotifier {
         .replaceAll(RegExp(r'\s+'), '')
         .replaceAll(RegExp(r'[^a-z0-9]'), '');
 
-    return 'facture-$dateStr-$countStr-$cleanedName';
+    return '$typeLabel-$dateStr-$countStr-$cleanedName';
   }
 
 }

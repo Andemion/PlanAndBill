@@ -22,6 +22,10 @@ void main() async {
     androidProvider: AndroidProvider.playIntegrity, // ou .debug pour tests
   );
 
+  // for notifications
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.initialize();
+
   runApp(const MyApp());
 }
 

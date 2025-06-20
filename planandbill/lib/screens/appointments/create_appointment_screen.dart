@@ -33,6 +33,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
   TimeOfDay _selectedTime = TimeOfDay.now();
   int _duration = 60;
   bool _isLoading = false;
+  String _selectedCurrency = '€';
 
   final List<String> _appointmentTypes = [
     'Individual Therapy',
@@ -445,14 +446,37 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _feeController,
-              decoration: const InputDecoration(
-                hintText: '0.00',
-                border: OutlineInputBorder(),
-                prefixText: '€ ',
-              ),
-              keyboardType: TextInputType.number,
+            Row(
+              children: [
+                DropdownButton<String>(
+                  value: _selectedCurrency,
+                  items: ['€', 'CHF'].map((currency) {
+                    return DropdownMenuItem(
+                      value: currency,
+                      child: Text(currency),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedCurrency = value;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _feeController,
+                    decoration: InputDecoration(
+                      hintText: '0.00',
+                      border: const OutlineInputBorder(),
+                      prefixText: '$_selectedCurrency ',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -547,6 +571,7 @@ class _CreateAppointmentScreenState extends State<CreateAppointmentScreen> {
         location: _locationController.text,
         notes: _notesController.text,
         fee: _feeController.text.isNotEmpty ? double.tryParse(_feeController.text) : null,
+        currency: _selectedCurrency,
         status: 'scheduled',
         createdAt: widget.appointment?.createdAt ?? DateTime.now(),
       );

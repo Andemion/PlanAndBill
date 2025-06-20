@@ -34,6 +34,8 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
   List<InvoiceItem> _items = [];
   double _taxRate = 20.0; // Default 20% VAT
   bool _isLoading = false;
+  String _currency = "€";
+  String _type = "invoice";
 
   @override
   void initState() {
@@ -75,6 +77,11 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
     _taxRate = invoice.taxRate;
     _notesController.text = invoice.notes;
     _selectedClient = clientService.getClientById(invoice.clientId);
+    _currency = invoice.currency;
+    _type = invoice.type;
+    if (_currency == "CHF"){
+      _taxRate = 0;
+    }
   }
 
   Future<void> _generateNumber() async {
@@ -353,10 +360,10 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
                 Expanded(
                   child: TextFormField(
                     initialValue: item.unitPrice.toString(),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Price',
                       border: OutlineInputBorder(),
-                      prefixText: '€',
+                      prefixText: '${_currency ?? '€'}',
                     ),
                     keyboardType: TextInputType.number,
                     onChanged: (value) {
@@ -376,7 +383,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Text(
-                  'Total: €${item.total.toStringAsFixed(2)}',
+                  'Total: ${_currency} ${item.total.toStringAsFixed(2)}',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ],
@@ -451,7 +458,7 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
             ),
           ),
           Text(
-            '€${amount.toStringAsFixed(2)}',
+            ' ${_currency} ${amount.toStringAsFixed(2)}',
             style: TextStyle(
               fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
               fontSize: isTotal ? 16 : 14,
@@ -516,8 +523,12 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
   }
 
   double _calculateSubtotal() {
-    return _items.fold(0.0, (sum, item) => sum + item.total);
+    return _items.fold(0.0, (sum, item) {
+      final priceHT = item.unitPrice / (1 + (_taxRate / 100));
+      return sum + (priceHT * item.quantity);
+    });
   }
+
 
   Future<void> _selectDate() async {
     final date = await showDatePicker(
@@ -584,18 +595,14 @@ class _CreateInvoiceScreenState extends State<CreateInvoiceScreen> {
         taxRate: _taxRate,
         taxAmount: taxAmount,
         total: total,
+        currency: _currency,
         status: 'draft',
-        type: widget.type,
+        type: _type,
         notes: _notesController.text,
         createdAt: widget.invoice?.createdAt ?? DateTime.now(),
       );
 
-      bool success;
-      if (widget.invoice == null) {
-        success = await invoiceService.createInvoice(invoice);
-      } else {
-        success = await invoiceService.updateInvoice(invoice);
-      }
+      bool success = await invoiceService.upsertInvoice(invoice);
 
       if (success && mounted) {
         Navigator.of(context).pop(true);

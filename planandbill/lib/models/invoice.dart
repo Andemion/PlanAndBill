@@ -4,11 +4,13 @@ class InvoiceItem {
   final String description;
   final int quantity;
   final double unitPrice;
+  final String currency;
 
   InvoiceItem({
     required this.description,
     required this.quantity,
     required this.unitPrice,
+    this.currency = '€',
   });
 
   double get total => quantity * unitPrice;
@@ -18,6 +20,7 @@ class InvoiceItem {
       'description': description,
       'quantity': quantity,
       'unitPrice': unitPrice,
+      'currency': currency,
     };
   }
 
@@ -26,6 +29,7 @@ class InvoiceItem {
       description: map['description'] ?? '',
       quantity: map['quantity'] ?? 1,
       unitPrice: map['unitPrice']?.toDouble() ?? 0.0,
+      currency: map['currency'] ?? '€',
     );
   }
 }
@@ -43,6 +47,7 @@ class Invoice {
   final double taxRate;
   final double taxAmount;
   final double total;
+  final String currency;
   final String status; // draft, sent, paid, overdue
   final String type; // invoice, quote
   final String notes;
@@ -61,6 +66,7 @@ class Invoice {
     required this.subtotal,
     required this.taxRate,
     required this.taxAmount,
+    required this.currency,
     required this.total,
     required this.status,
     required this.type,
@@ -82,6 +88,7 @@ class Invoice {
       'subtotal': subtotal,
       'taxRate': taxRate,
       'taxAmount': taxAmount,
+      'currency': currency,
       'total': total,
       'status': status,
       'type': type,
@@ -106,6 +113,7 @@ class Invoice {
       subtotal: map['subtotal']?.toDouble() ?? 0.0,
       taxRate: map['taxRate']?.toDouble() ?? 0.0,
       taxAmount: map['taxAmount']?.toDouble() ?? 0.0,
+      currency: map['currency'] ?? '€',
       total: map['total']?.toDouble() ?? 0.0,
       status: map['status'] ?? 'draft',
       type: map['type'] ?? 'invoice',
@@ -128,6 +136,7 @@ class Invoice {
     double? taxRate,
     double? taxAmount,
     double? total,
+    String? currency,
     String? status,
     String? type,
     String? notes,
@@ -147,6 +156,7 @@ class Invoice {
       taxRate: taxRate ?? this.taxRate,
       taxAmount: taxAmount ?? this.taxAmount,
       total: total ?? this.total,
+      currency: currency ?? this.currency,
       status: status ?? this.status,
       type: type ?? this.type,
       notes: notes ?? this.notes,

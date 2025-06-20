@@ -409,10 +409,13 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
 
                 final invoiceService = Provider.of<InvoiceService>(context, listen: false);
                 final authService = Provider.of<AuthService>(context, listen: false);
+                final isFuture = appointment.date.isAfter(DateTime.now());
+                final invoiceType = isFuture ? 'quote' : 'invoice';
 
                 final generatedNumber = await invoiceService.generateCustomInvoiceNumber(
                   clientName: appointment.clientName,
                   userId: authService.user!.id,
+                  typeLabel: isFuture ? 'devis' : 'facture',
                 );
 
                 // Create an invoice item from the appointment
@@ -436,8 +439,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                   taxRate: 20.0, // Default tax rate
                   taxAmount: invoiceItem.total * 0.2,
                   total: invoiceItem.total * 1.2,
+                  currency: appointment.currency,
                   status: 'draft',
-                  type: 'invoice',
+                  type: invoiceType,
                   notes: 'Generated from appointment on ${_formatDate(appointment.date)} at ${appointment.time}',
                   createdAt: DateTime.now(),
                 );

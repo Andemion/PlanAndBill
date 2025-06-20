@@ -378,6 +378,7 @@ class AppointmentDetailsScreen extends StatelessWidget {
       taxRate: 20.0,
       taxAmount: invoiceItem.total * 0.2,
       total: invoiceItem.total * 1.2,
+      currency: appointment.currency,
       status: 'draft',
       type: 'invoice',
       notes: 'Generated from appointment on ${_formatDate(appointment.date)} at ${appointment.time}',

@@ -85,7 +85,7 @@ class RecentInvoicesWidget extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '€${invoice.total.toStringAsFixed(2)}',
+                    '${invoice.currency} ${invoice.total.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,

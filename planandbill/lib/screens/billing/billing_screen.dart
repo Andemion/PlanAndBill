@@ -4,8 +4,11 @@ import 'package:planandbill/theme/app_theme.dart';
 import 'package:planandbill/screens/billing/create_invoice_screen.dart';
 import 'package:planandbill/screens/billing/invoice_details_screen.dart';
 import 'package:planandbill/services/invoice_service.dart';
+import 'package:planandbill/services/appointment_service.dart';
 import 'package:planandbill/services/auth_service.dart';
+import 'package:planandbill/services/pdf_service.dart';
 import 'package:planandbill/models/invoice.dart';
+
 
 class BillingScreen extends StatefulWidget {
   const BillingScreen({super.key});
@@ -25,7 +28,8 @@ class _BillingScreenState extends State<BillingScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authService = Provider.of<AuthService>(context, listen: false);
-      final invoiceService = Provider.of<InvoiceService>(context, listen: false);
+      final invoiceService = Provider.of<InvoiceService>(
+          context, listen: false);
       if (authService.user != null) {
         invoiceService.fetchInvoicesForUser(authService.user!.id);
       }
@@ -50,20 +54,15 @@ class _BillingScreenState extends State<BillingScreen>
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showCreateDocumentDialog();
-        },
-        backgroundColor: AppColors.forestGreen,
-        child: const Icon(Icons.add),
-      ),
     );
   }
 
   Widget _buildTabBar() {
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: Theme
+            .of(context)
+            .cardColor,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -194,49 +193,87 @@ class _BillingScreenState extends State<BillingScreen>
     return Consumer<InvoiceService>(
       builder: (context, invoiceService, child) {
         final currentMonth = DateTime.now();
-        final monthlyRevenue = invoiceService.getMonthlyRevenue(currentMonth);
-        final pendingInvoices = invoiceService.getPendingInvoices();
-        final totalClients = Provider.of<AuthService>(context).user != null ?
-        invoiceService.invoices.map((i) => i.clientId).toSet().length : 0;
+        final invoices = invoiceService.invoices;
 
-        return Padding(
+        final invoicesEUR = invoices.where((i) =>
+        i.currency == '€' &&
+            i.date.month == currentMonth.month &&
+            i.date.year == currentMonth.year).toList();
+
+        final invoicesCHF = invoices.where((i) =>
+        i.currency == 'CHF' &&
+            i.date.month == currentMonth.month &&
+            i.date.year == currentMonth.year).toList();
+
+        final monthlyRevenueEUR = invoicesEUR.fold(
+            0.0, (sum, i) => sum + i.total);
+        final monthlyRevenueCHF = invoicesCHF.fold(
+            0.0, (sum, i) => sum + i.total);
+
+        final pendingEUR = invoicesEUR
+            .where((i) => i.status == 'sent')
+            .toList();
+        final pendingCHF = invoicesCHF
+            .where((i) => i.status == 'sent')
+            .toList();
+
+        final totalClients = invoices
+            .map((i) => i.clientId)
+            .toSet()
+            .length;
+
+        return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Financial Reports',
-                style: Theme.of(context).textTheme.titleLarge,
+                style: Theme
+                    .of(context)
+                    .textTheme
+                    .titleLarge,
               ),
               const SizedBox(height: 16),
+
               _buildReportCard(
                 'Monthly Revenue',
-                '€${monthlyRevenue.toStringAsFixed(2)}',
+                '€ ${monthlyRevenueEUR.toStringAsFixed(2)}',
+                'CHF ${monthlyRevenueCHF.toStringAsFixed(2)}',
                 _getMonthName(currentMonth.month),
                 Icons.trending_up,
                 AppColors.forestGreen,
               ),
+
               const SizedBox(height: 12),
+
               _buildReportCard(
                 'Pending Invoices',
-                '€${pendingInvoices.fold(0.0, (sum, invoice) => sum + invoice.total).toStringAsFixed(2)}',
-                '${pendingInvoices.length} invoices',
+                '€ ${pendingEUR
+                    .fold(0.0, (sum, i) => sum + i.total)
+                    .toStringAsFixed(2)}',
+                'CHF ${pendingCHF
+                    .fold(0.0, (sum, i) => sum + i.total)
+                    .toStringAsFixed(2)}',
+                '${pendingEUR.length + pendingCHF.length} invoices',
                 Icons.pending_actions,
                 AppColors.goldenYellow,
               ),
+
               const SizedBox(height: 12),
+
               _buildReportCard(
                 'Total Clients',
                 totalClients.toString(),
+                '', // Pas de deuxième ligne ici
                 'Active clients',
                 Icons.people,
                 AppColors.peach,
               ),
+
               const SizedBox(height: 24),
               ElevatedButton.icon(
-                onPressed: () {
-                  _generateDetailedReport();
-                },
+                  onPressed: () => _generateDetailedReport(context),
                 icon: const Icon(Icons.file_download),
                 label: const Text('Export Monthly Report'),
                 style: ElevatedButton.styleFrom(
@@ -250,7 +287,8 @@ class _BillingScreenState extends State<BillingScreen>
     );
   }
 
-  Widget _buildDocumentCard(BuildContext context, Invoice document, String type) {
+  Widget _buildDocumentCard(BuildContext context, Invoice document,
+      String type) {
     final isInvoice = type == 'invoice';
     final icon = isInvoice ? Icons.receipt : Icons.description;
 
@@ -315,7 +353,7 @@ class _BillingScreenState extends State<BillingScreen>
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '€${document.total.toStringAsFixed(2)}',
+                    '${document.currency} ${document.total.toStringAsFixed(2)}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -348,13 +386,12 @@ class _BillingScreenState extends State<BillingScreen>
     );
   }
 
-  Widget _buildReportCard(
-      String title,
-      String value,
+  Widget _buildReportCard(String title,
+      String line1,
+      String line2,
       String subtitle,
       IconData icon,
-      Color color,
-      ) {
+      Color color,) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -367,106 +404,26 @@ class _BillingScreenState extends State<BillingScreen>
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                icon,
-                color: color,
-                size: 24,
-              ),
+              child: Icon(icon, color: color, size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 12,
-                    ),
-                  ),
+                  Text(title,
+                      style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                  Text(line1, style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 18)),
+                  Text(line2, style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 18)),
+                  Text(subtitle,
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12)),
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showCreateDocumentDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create Document'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.receipt),
-              title: const Text('New Invoice'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const CreateInvoiceScreen(type: 'invoice'),
-                  ),
-                ).then((result) {
-                  if (result == true) {
-                    final authService = Provider.of<AuthService>(context, listen: false);
-                    final invoiceService = Provider.of<InvoiceService>(context, listen: false);
-                    if (authService.user != null) {
-                      invoiceService.fetchInvoicesForUser(authService.user!.id);
-                    }
-                  }
-                });
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.description),
-              title: const Text('New Quote'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const CreateInvoiceScreen(type: 'quote'),
-                  ),
-                ).then((result) {
-                  if (result == true) {
-                    final authService = Provider.of<AuthService>(context, listen: false);
-                    final invoiceService = Provider.of<InvoiceService>(context, listen: false);
-                    if (authService.user != null) {
-                      invoiceService.fetchInvoicesForUser(authService.user!.id);
-                    }
-                  }
-                });
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _generateDetailedReport() {
-    // TODO: Implement PDF report generation
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Report generation feature coming soon!'),
       ),
     );
   }
@@ -504,4 +461,64 @@ class _BillingScreenState extends State<BillingScreen>
     _tabController.dispose();
     super.dispose();
   }
+
+  void _generateDetailedReport(BuildContext context) async {
+    final invoiceService = Provider.of<InvoiceService>(context, listen: false);
+    final appointmentService = Provider.of<AppointmentService>(context, listen: false);
+    final authService = Provider.of<AuthService>(context, listen: false);
+
+    final currentMonth = DateTime.now();
+
+    // Données nécessaires
+    final invoices = invoiceService.invoices.where((i) =>
+    i.date.month == currentMonth.month && i.date.year == currentMonth.year
+    ).toList();
+
+    final totalClients = invoices.map((i) => i.clientId).toSet().length;
+
+    final appointments = appointmentService.appointments.where((a) =>
+    a.date.month == currentMonth.month && a.date.year == currentMonth.year
+    ).toList();
+
+    final totalAppointments = appointments.length;
+
+    final pdfService = PdfService();
+    final pdfData = await pdfService.generateMonthlyReportPdf(
+      currentMonth,
+      invoices,
+      totalClients,
+      totalAppointments,
+    );
+
+    // Afficher les options
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export Monthly Report'),
+        content: const Text('What would you like to do with the report?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              pdfService.printPdf(pdfData, 'monthly_report');
+            },
+            child: const Text('Print'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              pdfService.savePdf(pdfData, 'monthly_report.pdf');
+            },
+            child: const Text('Save'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
+
