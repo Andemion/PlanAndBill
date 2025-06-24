@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:planandbill/services/auth_service.dart';
 import 'package:planandbill/services/notification_service.dart';
+import 'package:planandbill/services/appointment_service.dart';
 import 'package:planandbill/screens/auth/login_screen.dart';
 import 'package:planandbill/screens/settings/business_info_screen.dart';
 import 'package:planandbill/theme/app_theme.dart';
@@ -15,8 +16,8 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _notificationsEnabled = true;
-  bool _emailReportsEnabled = true;
+  bool _notificationsEnabled = false;
+  bool _emailReportsEnabled = false;
   bool _dailyReminderEnabled = false;
   TimeOfDay _dailyReminderTime = const TimeOfDay(hour: 8, minute: 0);
 
@@ -24,7 +25,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final user = Provider.of<AuthService>(context).user;
     final appointmentService = Provider.of<AppointmentService>(context, listen: false);
-    final appointments = await appointmentService.getAppointmentsForUser(user!.id);
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -48,7 +48,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   setState(() {
                     _notificationsEnabled = value;
                   });
+
+                  // Enregistre le choix de l'utilisateur
+                  await NotificationService.setNotificationsEnabled(value);
                   if (value) {
+                    await appointmentService.fetchAppointments(user!.id);
+                    final appointments = appointmentService.appointments;
                     for (final appointment in appointments) {
                       // Planifie seulement ceux dans le futur
                       if (appointment.date.isAfter(DateTime.now())) {
@@ -56,8 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       }
                     }
                   } else {
-                    // Optionnel : cancel all notifications
-                    await FlutterLocalNotificationsPlugin().cancelAll();
+                    await NotificationService.cancelAllNotifications();
                   }
                 },
               ),

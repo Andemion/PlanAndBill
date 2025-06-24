@@ -10,6 +10,7 @@ import 'package:planandbill/theme/app_theme.dart';
 import 'package:planandbill/services/appointment_service.dart';
 import 'package:planandbill/services/client_service.dart';
 import 'package:planandbill/services/invoice_service.dart';
+import 'package:planandbill/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

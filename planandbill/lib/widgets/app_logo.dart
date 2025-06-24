@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:planandbill/theme/app_theme.dart';
 
 class AppLogo extends StatelessWidget {
   final double size;
@@ -11,33 +10,12 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: size,
       height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.forestGreen,
-            AppColors.darkNavy,
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.darkNavy.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Center(
-        child: Icon(
-          Icons.calendar_today,
-          color: AppColors.lightBeige,
-          size: size * 0.5,
-        ),
+      child: Image.asset(
+        'assets/icons/app_icon.png',
+        fit: BoxFit.contain,
       ),
     );
   }

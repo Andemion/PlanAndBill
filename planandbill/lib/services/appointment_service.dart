@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:planandbill/models/appointment.dart';
+import 'package:planandbill/services/notification_service.dart';
 
 class AppointmentService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
 
   List<Appointment> _appointments = [];
   bool _isLoading = false;
@@ -60,8 +62,14 @@ class AppointmentService extends ChangeNotifier {
 
       _appointments.add(appointment);
       _appointments.sort((a, b) => a.date.compareTo(b.date));
-
       notifyListeners();
+
+      final isEnabled = await NotificationService.getNotificationsEnabled();
+      if (isEnabled && appointment.date.isAfter(DateTime.now())) {
+        await NotificationService.scheduleAppointmentNotification(appointment);
+      }
+
+
       return true;
     } catch (e) {
       _error = e.toString();
@@ -94,8 +102,13 @@ class AppointmentService extends ChangeNotifier {
         _appointments[index] = updatedAppointment;
         _appointments.sort((a, b) => a.date.compareTo(b.date));
       }
-
       notifyListeners();
+
+      final isEnabled = await NotificationService.getNotificationsEnabled();
+      if (isEnabled && updatedAppointment.date.isAfter(DateTime.now())) {
+        await NotificationService.scheduleAppointmentNotification(updatedAppointment);
+      }
+
       return true;
     } catch (e) {
       _error = e.toString();
