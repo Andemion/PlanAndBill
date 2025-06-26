@@ -22,6 +22,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   TimeOfDay _dailyReminderTime = const TimeOfDay(hour: 8, minute: 0);
 
   @override
+  void initState() {
+    super.initState();
+    _loadNotificationPreference();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final user = Provider.of<AuthService>(context).user;
     final appointmentService = Provider.of<AppointmentService>(context, listen: false);
@@ -48,7 +54,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   setState(() {
                     _notificationsEnabled = value;
                   });
-
                   // Enregistre le choix de l'utilisateur
                   await NotificationService.setNotificationsEnabled(value);
                   if (value) {
@@ -65,7 +70,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   }
                 },
               ),
-
               _buildSwitchTile(
                 'Daily Notification',
                 'Receive the list of tomorrow\'s appointments',
@@ -75,6 +79,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   setState(() {
                     _dailyReminderEnabled = value;
                   });
+                  // Enregistre le choix de l'utilisateur
+                  await NotificationService.setNotificationsEnabled(value);
+                  if (value) {
+                    await appointmentService.fetchAppointments(user!.id);
+                    final appointments = appointmentService.appointments;
+                    for (final appointment in appointments) {
+                      // Planifie seulement ceux dans le futur
+                      if (appointment.date.isAfter(DateTime.now())) {
+                        await NotificationService.scheduleAppointmentNotification(appointment);
+                      }
+                    }
+                  } else {
+                    await NotificationService.cancelAllNotifications();
+                  }
                 },
               ),
               if (_dailyReminderEnabled)
@@ -619,5 +637,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  void _loadNotificationPreference() async {
+    final value = await NotificationService.getNotificationsEnabled();
+    setState(() {
+      _notificationsEnabled = value;
+    });
   }
 }

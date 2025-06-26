@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:planandbill/models/appointment.dart';
@@ -5,7 +9,6 @@ import 'package:planandbill/services/notification_service.dart';
 
 class AppointmentService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
 
   List<Appointment> _appointments = [];
   bool _isLoading = false;
@@ -65,10 +68,21 @@ class AppointmentService extends ChangeNotifier {
       notifyListeners();
 
       final isEnabled = await NotificationService.getNotificationsEnabled();
+
+      // Vérifie la version Android
+      if (Platform.isAndroid) {
+        final deviceInfo = DeviceInfoPlugin();
+        final androidInfo = await deviceInfo.androidInfo;
+
+        if (androidInfo.version.sdkInt >= 31) {
+          await NotificationService.requestExactAlarmPermission();
+        }
+      }
+
+      // Planifie la notification si activée et RDV dans le futur
       if (isEnabled && appointment.date.isAfter(DateTime.now())) {
         await NotificationService.scheduleAppointmentNotification(appointment);
       }
-
 
       return true;
     } catch (e) {
