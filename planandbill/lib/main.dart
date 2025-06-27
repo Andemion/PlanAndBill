@@ -20,11 +20,10 @@ void main() async {
 
   // ✅ Activation de AppCheck (après)
   await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.playIntegrity, // ou .debug pour tests
+    androidProvider: AndroidProvider.debug, // playIntegrity ou debug pour tests
   );
 
   // for notifications
-  WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.initialize();
 
   runApp(const MyApp());

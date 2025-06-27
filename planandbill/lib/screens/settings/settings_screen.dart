@@ -24,7 +24,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadNotificationPreference();
+    _loadSettings();
   }
 
   @override
@@ -55,7 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _notificationsEnabled = value;
                   });
                   // Enregistre le choix de l'utilisateur
-                  await NotificationService.setNotificationsEnabled(value);
+                  await NotificationService.setPushNotifications(value);
                   if (value) {
                     await appointmentService.fetchAppointments(user!.id);
                     final appointments = appointmentService.appointments;
@@ -65,8 +65,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         await NotificationService.scheduleAppointmentNotification(appointment);
                       }
                     }
-                  } else {
-                    await NotificationService.cancelAllNotifications();
                   }
                 },
               ),
@@ -75,24 +73,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 'Receive the list of tomorrow\'s appointments',
                 Icons.today_outlined,
                 _dailyReminderEnabled,
-                    (value) {
+                    (value) async {
                   setState(() {
                     _dailyReminderEnabled = value;
                   });
                   // Enregistre le choix de l'utilisateur
-                  await NotificationService.setNotificationsEnabled(value);
-                  if (value) {
-                    await appointmentService.fetchAppointments(user!.id);
-                    final appointments = appointmentService.appointments;
-                    for (final appointment in appointments) {
-                      // Planifie seulement ceux dans le futur
-                      if (appointment.date.isAfter(DateTime.now())) {
-                        await NotificationService.scheduleAppointmentNotification(appointment);
-                      }
-                    }
-                  } else {
-                    await NotificationService.cancelAllNotifications();
-                  }
+                  await NotificationService.setDailyReminder(value);
                 },
               ),
               if (_dailyReminderEnabled)
@@ -111,6 +97,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       setState(() {
                         _dailyReminderTime = picked;
                       });
+                      // Enregistre le choix de l'utilisateur
+                      await NotificationService.setDailyReminderTime(_dailyReminderTime);
                     }
                   },
                 ),
@@ -639,10 +627,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _loadNotificationPreference() async {
-    final value = await NotificationService.getNotificationsEnabled();
+  void _loadSettings() async {
+    final push = await NotificationService.getPushNotifications();
+    final daily = await NotificationService.getDailyReminder();
+    final hour = await NotificationService.getDailyReminderTime();
+
     setState(() {
-      _notificationsEnabled = value;
+      _notificationsEnabled = push;
+      _dailyReminderEnabled = daily;
+      _dailyReminderTime = hour;
     });
   }
 }

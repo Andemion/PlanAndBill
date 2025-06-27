@@ -4,12 +4,15 @@ import 'package:planandbill/screens/appointments/create_appointment_screen.dart'
 import 'package:planandbill/services/auth_service.dart';
 import 'package:planandbill/services/appointment_service.dart';
 import 'package:planandbill/services/invoice_service.dart';
+import 'package:planandbill/services/notification_service.dart';
 import 'package:provider/provider.dart';
 import 'package:planandbill/models/appointment.dart';
 import 'package:planandbill/screens/appointments/appointment_details_screen.dart';
 import 'package:planandbill/screens/billing/create_invoice_screen.dart';
 import 'package:planandbill/models/invoice.dart';
 import 'package:intl/intl.dart';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 class AppointmentsScreen extends StatefulWidget {
   const AppointmentsScreen({super.key});
@@ -53,6 +56,18 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           Expanded(
             child: _buildAppointmentsList(),
           ),
+          // // 👇 Bouton de test
+          // Padding(
+          //   padding: const EdgeInsets.symmetric(vertical: 12),
+          //   child: ElevatedButton.icon(
+          //     onPressed: () async {
+          //       final now = tz.TZDateTime.now(NotificationService.getLocalTimeZone()).add(const Duration(seconds: 5));
+          //       await NotificationService.scheduleTestNotification(now);
+          //     },
+          //     icon: const Icon(Icons.notifications),
+          //     label: const Text("Tester une notification immédiate"),
+          //   ),
+          // ),
         ],
       ),
       floatingActionButton: FloatingActionButton(

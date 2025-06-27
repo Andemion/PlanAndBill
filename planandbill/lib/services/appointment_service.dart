@@ -10,6 +10,8 @@ import 'package:planandbill/services/notification_service.dart';
 class AppointmentService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  late AppointmentService _appointmentService;
+
   List<Appointment> _appointments = [];
   bool _isLoading = false;
   String? _error;
@@ -67,7 +69,7 @@ class AppointmentService extends ChangeNotifier {
       _appointments.sort((a, b) => a.date.compareTo(b.date));
       notifyListeners();
 
-      final isEnabled = await NotificationService.getNotificationsEnabled();
+      final isEnabled = await NotificationService.getPushNotifications();
 
       // Vérifie la version Android
       if (Platform.isAndroid) {
@@ -118,7 +120,7 @@ class AppointmentService extends ChangeNotifier {
       }
       notifyListeners();
 
-      final isEnabled = await NotificationService.getNotificationsEnabled();
+      final isEnabled = await NotificationService.getPushNotifications();
       if (isEnabled && updatedAppointment.date.isAfter(DateTime.now())) {
         await NotificationService.scheduleAppointmentNotification(updatedAppointment);
       }
